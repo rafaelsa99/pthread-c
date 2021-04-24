@@ -17,8 +17,10 @@ int main(int argc, char* argv[])
 	int nWords = 0;
 	char buffer[BUFFER_SIZE];
 	unsigned char auxArray[4];
-	char a;
+	unsigned char a;
 	int aux = 0;
+	int flag = 0;
+	char ch;
 
 	fprintf(stdout, file_name);
 
@@ -26,24 +28,40 @@ int main(int argc, char* argv[])
 	fopen_s(&inputStream, "text0.txt", "rb");
 	fseek(inputStream, 0, SEEK_END);
 	long int size = ftell(inputStream); // now you got size of file in bytes
-	fseek(inputStream, 0, SEEK_SET);    // same as rewind(fp)
+	fseek(inputStream, 0, SEEK_SET);
 
 	for (int i = 0; i < size; i++)
 	{
-		fread(&a, sizeof(char), 1, inputStream); // you read one int (sizeof(int)!=1 byte)
-		printf("\n%x", a);
-		//printf("%d",(a >> 8) == -1);
-		if ((a >> 8) == -1) {
-			auxArray[aux] = a;
-			aux++;
+		fread(&a, sizeof(unsigned char), 1, inputStream); // you read one int (sizeof(int)!=1 byte)
+		ch = removeAccented((unsigned char)a);
+		printf("\n%x", ch);
+		if(ch != ' ' && ch != '\0' && isAlphaNumeric(ch))
+		{
+			flag = 1;
+			ch = tolower(ch);
+			if (!isVowel(&ch))
+			{
+				nConsoants++;
+			}
+			nCharacters++;
+		}else if ((unsigned char)ch == 0xC3)
+		{
+			//this is a special char needs to be converted
+			//flag = 1;
+			continue;
 		}
-		else {
-			aux = 0;
+		else if ((unsigned char)ch == 0x20 || (unsigned char)ch == 0x29 || (unsigned char)ch == 0xA)
+		{
+			flag = 0;
+			nCharacters++;
+			continue;
 		}
-		printf("%x", auxArray);
+		else if(flag)
+		{
+			nWords++;
+		}
 	}
 	fclose(inputStream);
-	getch();
 
 	//while (fread_s(buffer, sizeof(buffer), ELEMENTSIZE, ELEMENTCOUNT, &inputStream) != NULL)
 	//{
@@ -80,6 +98,30 @@ int main(int argc, char* argv[])
 	printf("N de Palavras: %d\n", nWords);
 }
 
+
+char removeAccented(unsigned char ch){
+	if ((ch >= 0xA0 && ch <= 0xA3) || (ch >= 0x80 && ch <= 0x83))
+		return 'a';
+
+	if ((ch >= 0xA8 && ch <= 0xAA) || (ch >= 0x88 && ch <= 0x8A))
+		return 'e';
+
+	if ((ch >= 0xAC && ch <= 0xAD) || (ch >= 0x8C && ch <= 0x8D))
+		return 'i';
+
+	if ((ch >= 0xB2 && ch <= 0xB5) || (ch >= 0x92 && ch <= 0x95))
+		return 'o';
+
+	if ((ch >= 0xB9 && ch <= 0xBB) || (ch >= 0x99 && ch <= 0x9B))
+		return 'u';
+
+	if (ch == 0xA7 || ch == 0x87)
+		return 'c';
+
+	return ch;
+}
+
+
 /* Verificar se é vogal
 * Procedimento * Parâmetros de entrada:
 * character ---- character a avaliar
@@ -100,13 +142,6 @@ int isAlphaNumeric(char* character) {
 		return 1;
 	}
 	return 0;
-}
-
-char handleUTF8(char character) {
-	if ((character & 0xC0) == 0x80)
-	{
-		// Handle multi-byte
-	}
 }
 
 /* Abertura de um ficheiro
