@@ -17,19 +17,36 @@
 
 /** \brief worker threads return status array */
 extern int *statusWorker;
-
+/** \brief array of file names to be processed */
 char **filenames;
+/** \brief number of files to be processed */
 int numFiles;
+/** \brief id of the file currently being processed */
 int currentFileId;
-int *length, *pointsAssigned, *pointsCalculated;
-double **x, **y, **xyPrev, **xyCurr;
+/** \brief array for the length of the signals of each file */
+int *length;
+/** \brief array for the number of points assigned to the threads for each file */
+int *pointsAssigned;
+/** \brief array for the number of points calculated by thethreads for each file */
+int *pointsCalculated;
+/** \brief array for the arrays of signal x of each file */
+double **x;
+/** \brief array for the arrays of signal y of each file */
+double **y;
+/** \brief array for the arrays of previously computed signal xy of each file */
+double **xyPrev;
+/** \brief array for the arrays of currently computed signal xy of each file */
+double **xyCurr;
 /** \brief locking flag which warrants mutual exclusion inside the monitor */
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 /** \brief flag which warrants that the data transfer region is initialized exactly once */
 static pthread_once_t init = PTHREAD_ONCE_INIT;
 
+/** \brief Reads the contents of the next file to be processed. */
 int processNextFile();
+/** \brief Frees the allocated memory to the file names. */
 void freeFilenames();
+/** \brief Frees the allocated memory to the signals x and y. */
 void freeSignalArrays(int fileId);
 
 /**
@@ -125,11 +142,11 @@ void storeFileNames(int nFileNames, char **fileNames){
  *  \brief Get the next point to be computed by the thread.
  *
  *  \param threadId thread identification
- *  \param fileId file identification
- *  \param n signal length
- *  \param xArr signal x
- *  \param yArr signal y
- *  \param point point to be computed
+ *  \param fileId pointer to the file identification
+ *  \param n pointer to the signal length
+ *  \param xArr pointer to the signal x array
+ *  \param yArr pointer to the signal y array
+ *  \param point pointer to the point to be computed
  *
  *  \return END_PROCESS, when there is no more work to be done. 0, otherwise.
  */
@@ -142,13 +159,16 @@ int processConvPoint (int threadId, int *fileId, int *n, double **xArr, double *
 	    pthread_exit (&statusWorker[threadId]);
 	}
 	pthread_once (&init, initialization);
+	// Checks if all points in the file currently being processed have already been assigned to be computed
 	if(pointsAssigned[currentFileId] == length[currentFileId]){
-		if((currentFileId + 1) == numFiles){
+		if((currentFileId + 1) == numFiles){ // If it has already finished the last file, it ends the processing
 			ret = END_PROCESS;
 		} else {
+			// Processes the next file, as long as there is an error and there are files to read
 			do{
 				currentFileId++;
 			}while(currentFileId < numFiles && processNextFile() == -1);
+			// Checks if the processing of the last file gave an error and if the processing should be terminated
 			if(currentFileId == numFiles){
 				currentFileId--;
 				ret = END_PROCESS;
@@ -189,8 +209,9 @@ void savePartialResult (int threadId, int fileId, int point, double val){
 
 	xyCurr[fileId][point] = val;
 	pointsCalculated[fileId]++;
+	// Checks if all the points in a file have already been calculated
 	if(pointsCalculated[fileId] == length[fileId])
-		freeSignalArrays(fileId);
+		freeSignalArrays(fileId); //Frees the memory allocated to the signals x and y of that file
 
 	if ((statusWorker[threadId] = pthread_mutex_unlock (&mutex)) != 0){
 		errno = statusWorker[threadId];
@@ -207,12 +228,12 @@ void checkProcessingResults(){
 	int error = 0;
 	for(int i = 0; i < numFiles; i++)
 		for(int j = 0; j < length[i]; j++)
-			if(xyPrev[i][j] != xyCurr[i][j]){
+			if(xyPrev[i][j] != xyCurr[i][j]){ //Check if the results were different
 				printf("The point %d of the file %s obtained a wrong result. Expected: %f -> "
 						"Obtained: %f\n", j, filenames[i], xyPrev[i][j], xyCurr[i][j]);
 				error = 1;
 			}
-	if(error == 0)
+	if(error == 0) //Check if all results were equal
 		printf("All results were equal, so there was no computational error.\n");
 }
 
@@ -291,7 +312,7 @@ void freeFilenames(){
 }
 
 /**
- *  \brief Frees the allocated memory to the signals x and y
+ *  \brief Frees the allocated memory to the signals x and y.
  */
 void freeSignalArrays(int fileId){
 	free(x[fileId]);

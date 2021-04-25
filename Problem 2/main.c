@@ -1,11 +1,11 @@
-/*
- ============================================================================
- Name        : main.c
- Author      : Rafael Sá (104552), Luís Laranjeira (81526)
- Version     :
- Copyright   : 
- Description : General Problems - Problem 2
- ============================================================================
+/**
+ *  \file main.c (source file)
+ *
+ *  \brief General Problems - Problem 2.
+ *
+ *  Multi-threaded version.
+ *
+ *  \author Rafael Sá (104552), Luís Laranjeira (81526)
  */
 
 #include <stdio.h>
@@ -19,11 +19,16 @@
 /** \brief worker threads return status array */
 int *statusWorker;
 
-int processCommandLine(int argc, char **argv, int *nThreads, char **fileNames, int *nFileNames);
+/** \brief Process the arguments of the command line. */
+void processCommandLine(int argc, char **argv, int *nThreads, char **fileNames, int *nFileNames);
 
+/**
+ *  \brief Main thread.
+ *
+ *  It starts the simulation by generating the worker threads and waits for their termination.
+ */
 int main(int argc, char** argv) {
-	int nThreads, nFileNames, t;
-	int *status_p;
+	int nThreads, nFileNames, t, *status_p;
 	char *fileNames[MAX_STRING_LENGTH];
 	double t0, t1;
 
@@ -36,7 +41,7 @@ int main(int argc, char** argv) {
 		perror ("Error on allocating memory to array of status");
 		exit (EXIT_FAILURE);
 	}
-	pthread_t tIdWorkers[nThreads]; // Workers internal thread id array
+	pthread_t tIdWorkers[nThreads];   // Workers internal thread id array
 	unsigned int IdWorkers[nThreads]; // Workers application defined thread id array
 
 	t0 = ((double) clock())  / CLOCKS_PER_SEC;
@@ -60,12 +65,21 @@ int main(int argc, char** argv) {
 	t1 = ((double) clock())  / CLOCKS_PER_SEC;
 	printf ("\nElapsed time = %.6f s\n", t1 - t0);
 	checkProcessingResults ();
-	freeMemory();
+	freeMemory(); // Frees the memory allocated in the shared area
 	exit(EXIT_SUCCESS);
 }
 
-
-int processCommandLine(int argc, char **argv, int *nThreads, char **fileNames, int *nFileNames){
+/**
+ *  \brief Process the arguments of the command line.
+ *
+ *  \param argc number of arguments
+ *  \param argv arguments array
+ *  \param nThreads pointer to the variable for the number of threads
+ *  \param fileNames array for the fileNames
+ *  \param nFileNames pointer to the variable for the number of files
+ *
+ */
+void processCommandLine(int argc, char **argv, int *nThreads, char **fileNames, int *nFileNames){
 	if(argc < 3){
 		printf("Invalid number of arguments.\nParameters: <NumberThreads> <FileName1> [<FileName2> ...]\n");
 		exit(EXIT_FAILURE);
@@ -78,5 +92,4 @@ int processCommandLine(int argc, char **argv, int *nThreads, char **fileNames, i
 	for(int i = 2, j = 0; i < argc; i++, j++)
 		fileNames[j] = argv[i];
 	*nFileNames = argc - 2;
-	return 0;
 }

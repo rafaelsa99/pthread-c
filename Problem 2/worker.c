@@ -1,8 +1,13 @@
-/*
- * worker.c
+/**
+ *  \file worker.c (source file)
  *
- *  Created on: 24/04/2021
- *      Author: rafael
+ *  \brief Worker thread definition.
+ * *
+ *  Definition of the operations carried out by the worker thread:
+ *     \li *worker
+ *     \li computeValue
+ *
+ *  \author Rafael Sá (104552), Luís Laranjeira (81526)
  */
 
 #include <stdio.h>
@@ -15,6 +20,18 @@
 /** \brief worker threads return status array */
 extern int *statusWorker;
 
+/**
+ *  \brief Get the next point to be computed by the thread.
+ *
+ *  \param threadId thread identification
+ *  \param fileId pointer to the file identification
+ *  \param n pointer to the signal length
+ *  \param xArr pointer to the signal x array
+ *  \param yArr pointer to the signal y array
+ *  \param point pointer to the point to be computed
+ *
+ *  \return END_PROCESS, when there is no more work to be done. 0, otherwise.
+ */
 void *worker(void *arg){
 	unsigned int threadId = *((unsigned int *) arg);
 	int fileId, n, point;
@@ -27,6 +44,18 @@ void *worker(void *arg){
 	pthread_exit (&statusWorker[threadId]);
 }
 
+/**
+ *  \brief Compute the value of one point.
+ *
+ *  Internal thread operation.
+ *
+ *  \param n signal length
+ *  \param x signal x
+ *  \param y signal y
+ *  \param point point to be computed
+ *
+ *  \return value computed
+ */
 double computeValue(int n, double *x, double *y, int point){
 	double res = 0;
 	for(int i = 0; i < n; i++)

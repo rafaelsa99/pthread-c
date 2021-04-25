@@ -1,5 +1,5 @@
 /**
- *  \file sharedRegion.h (interface file)
+ *  \file sharedRegion.h (header file)
  *
  *  \brief Shared region definition.
  *
@@ -29,11 +29,11 @@ void storeFileNames(int nFileNames, char **fileNames);
  *  \brief Get the next point to be computed by the thread.
  *
  *  \param threadId thread identification
- *  \param fileId file identification
- *  \param n signal length
- *  \param xArr signal x
- *  \param yArr signal y
- *  \param point point to be computed
+ *  \param fileId pointer to the file identification
+ *  \param n pointer to the signal length
+ *  \param xArr pointer to the signal x array
+ *  \param yArr pointer to the signal y array
+ *  \param point pointer to the point to be computed
  *
  *  \return END_PROCESS, when there is no more work to be done. 0, otherwise.
  */
