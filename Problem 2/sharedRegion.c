@@ -30,7 +30,7 @@ static pthread_once_t init = PTHREAD_ONCE_INIT;
 
 int processNextFile();
 void freeFilenames();
-void writeResultsToFile();
+void freeSignalArrays(int fileId);
 
 /**
  *  \brief Initialization of the shared region.
@@ -189,6 +189,9 @@ void savePartialResult (int threadId, int fileId, int point, double val){
 
 	xyCurr[fileId][point] = val;
 	pointsCalculated[fileId]++;
+	if(pointsCalculated[fileId] == length[fileId])
+		freeSignalArrays(fileId);
+
 	if ((statusWorker[threadId] = pthread_mutex_unlock (&mutex)) != 0){
 		errno = statusWorker[threadId];
 	    perror ("Error on exiting monitor");
@@ -210,8 +213,7 @@ void checkProcessingResults(){
 				error = 1;
 			}
 	if(error == 0)
-		printf("All results were equal, so there was no computational error");
-	writeResultsToFile(); // -----------> Aqui ou sempre que um ficheiro acaba de ser processado?
+		printf("All results were equal, so there was no computational error.\n");
 }
 
 /**
@@ -251,61 +253,32 @@ int processNextFile(){
 	}
 	if (fread(y[currentFileId], sizeof (double), length[currentFileId], file) != length[currentFileId]){
 		fprintf(stderr,"Error reading array y from file %s: %s\n",filenames[currentFileId], strerror(errno));
-		free(x[currentFileId]);
-		free(y[currentFileId]);
+		freeSignalArrays(currentFileId);
 		fclose(file);
 		return -1;
 	}
 	if((xyPrev[currentFileId] = malloc(sizeof(double) * length[currentFileId])) == NULL){
 		fprintf(stderr,"Error allocating memory to array xy previously computed of file %s: %s\n",filenames[currentFileId], strerror(errno));
-		free(x[currentFileId]);
-		free(y[currentFileId]);
+		freeSignalArrays(currentFileId);
 		fclose(file);
 		return -1;
 	}
 	if (fread(xyPrev[currentFileId], sizeof (double), length[currentFileId], file) != length[currentFileId]){
 		fprintf(stderr,"Error reading array xy previously computed from file %s: %s\n",filenames[currentFileId], strerror(errno));
-		free(x[currentFileId]);
-		free(y[currentFileId]);
+		freeSignalArrays(currentFileId);
 		free(xyPrev[currentFileId]);
 		fclose(file);
 		return -1;
 	}
 	if((xyCurr[currentFileId] = malloc(sizeof(double) * length[currentFileId])) == NULL){
 		fprintf(stderr,"Error allocating memory to array xy to be computed of file %s: %s\n",filenames[currentFileId], strerror(errno));
-		free(x[currentFileId]);
-		free(y[currentFileId]);
+		freeSignalArrays(currentFileId);
 		free(xyPrev[currentFileId]);
 		fclose(file);
 		return -1;
 	}
 	fclose(file);
 	return 0;
-}
-
-/**
- *  \brief Writes the computed signals to the end of the files.
- */
-void writeResultsToFile(){
-	FILE *file;
-	for(int i = 0; i < numFiles; i++){
-		file = fopen(filenames[currentFileId], "rb+");
-		if(file == NULL){
-			fprintf(stderr,"Error on opening file %s: %s\n",filenames[currentFileId], strerror(errno));
-			continue;
-		}
-		if(fseek(file, 0, SEEK_END) != 0){
-			fprintf(stderr,"Error on setting the position on file %s: %s\n",filenames[currentFileId], strerror(errno));
-			fclose(file);
-			continue;
-		}
-		if(fwrite(xyCurr[i], sizeof (double), length[i], file) != length[i]){
-			fprintf(stderr,"Error on writing the results on file %s: %s\n",filenames[currentFileId], strerror(errno));
-			fclose(file);
-			continue;
-		}
-		fclose(file);
-	}
 }
 
 /**
@@ -318,6 +291,14 @@ void freeFilenames(){
 }
 
 /**
+ *  \brief Frees the allocated memory to the signals x and y
+ */
+void freeSignalArrays(int fileId){
+	free(x[fileId]);
+	free(y[fileId]);
+}
+
+/**
  *  \brief Frees the allocated dynamic memory.
  */
 void freeMemory(){
@@ -325,12 +306,8 @@ void freeMemory(){
 	for(int i = 0; i < numFiles; i++){
 		if(xyPrev[i] != NULL)
 			free(xyPrev[i]);
-		if(xyPrev[i] != NULL)
+		if(xyCurr[i] != NULL)
 			free(xyCurr[i]);
-		if(xyPrev[i] != NULL)
-			free(x[i]);
-		if(xyPrev[i] != NULL)
-			free(y[i]);
 	}
 	free(x);
 	free(y);
