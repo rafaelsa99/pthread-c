@@ -7,7 +7,7 @@ The program reads in succession several text files text#.txt whose names are pro
 
 ### Problem 2
 The circular cross-correlation is an important tool to detect similarities between two signals. For two signals with N samples, x(k) and y(k), with 0 ≤ k < N, the circular cross-correlation xy (i), with 0 ≤ i < N, is defined by the formula:<br>
-#### xy (i) = Σ[k=0, n−1] x (k )⋅ y [(i+k ) mod n] <br>
+</br><b> xy (i) = Σ[k=0, n−1] x (k )⋅ y [(i+k ) mod n] </b><br><br>
 The program reads in succession the values of pairs of signals stored in several data files
 whose names are provided in the command line, computes the circular cross-correlation of each pair
 and appends it to the corresponding file.
