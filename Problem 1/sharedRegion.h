@@ -5,13 +5,6 @@
  *
  *  Synchronization based on monitors.
  *
- *  Definition of the operations carried out on the shared region:
- *     \li storeFileNames
- *     \li processConvPoint
- *     \li savePartialResult
- *     \li checkProcessingResults
- *     \li freeMemory.
- *
  *  \author Rafael Sá (104552), Luís Laranjeira (81526)
  */
 
@@ -25,11 +18,26 @@
  *  \param fileNames array of file names to be processed
  */
 void storeFileNames(int nFileNames, char **fileNames);
-
-int getDataChunk (int threadId, char *buffer, struct PARTFILEINFO *partialInfo);
-
+/**
+ *  \brief Get the next chunk to be processed by a worker.
+ *
+ *  \param threadId thread identification
+ *  \param *buffer pointer to the buffer for the chunk
+ *  \param *partialInfo pointer to the struct to save the chunk information
+ *
+ *  \return END_PROCESS, when there is no more work to be done. 0, otherwise.
+ */
+int getDataChunk (int threadId, char (*buffer)[MAX_STRING_LENGTH], struct PARTFILEINFO *partialInfo);
+/**
+ *  \brief Save the information of a chunk.
+ *
+ *  \param threadId thread identification
+ *  \param *partialInfo pointer to the struct where the chunk information is saved
+ */
 void savePartialResult (int threadId, struct PARTFILEINFO *partialInfo);
-
+/**
+ *  \brief Prints the final results.
+ */
 void printProcessingResults();
 /**
  *  \brief Frees the allocated dynamic memory.

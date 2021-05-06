@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include "def.h"
 #include "sharedRegion.h"
+#include "worker.h"
 
 /** \brief worker threads return status array */
 extern int *statusWorker;
@@ -24,16 +25,15 @@ char **filenames;
 int numFiles;
 /** \brief id of the file currently being processed */
 int currentFileId;
-
+/** \brief array of structs to save the file information */
 struct PARTFILEINFO **fileInfo;
-
+/** \brief file pointer */
 FILE *inputStream;
-
 /** \brief locking flag which warrants mutual exclusion inside the monitor */
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 /** \brief flag which warrants that the data transfer region is initialized exactly once */
 static pthread_once_t init = PTHREAD_ONCE_INIT;
-
+/** \brief Closes the current file, if any, and opens the next file. */
 int processNextFile();
 /** \brief Frees the allocated memory to the file names. */
 void freeFilenames();
@@ -60,15 +60,15 @@ static void initialization (void){
 		}
 		fileInfo[i]->nCharacters = 0;
 		fileInfo[i]->nConsoants = 0;
-		fileInfo[i]->largestWord = 0; //numero de caracteres da maior palavra
-		fileInfo[i]->wordCount = 0; //numero de palavras
+		fileInfo[i]->largestWord = 0; 
+		fileInfo[i]->wordCount = 0; 
 		for (int j = 0; j < 50; j++) {
 			fileInfo[i]->nWordsBySize[j] = 0;
 			for (int k = 0; k < 50; k++)
 				fileInfo[i]->nConsoantsByWordLength[j][k] = 0;
 		}
 	}
-	processNextFile();
+	processNextFile(); //Opens the first file
 }
 
 /**
@@ -87,10 +87,18 @@ void storeFileNames(int nFileNames, char **fileNames){
 	}
 }
 
-
-int getDataChunk (int threadId, char *buffer, struct PARTFILEINFO *partialInfo){
-	int ret = 0;
-
+/**
+ *  \brief Get the next chunk to be processed by a worker.
+ *
+ *  \param threadId thread identification
+ *  \param *buffer pointer to the buffer for the chunk
+ *  \param *partialInfo pointer to the struct to save the chunk information
+ *
+ *  \return END_PROCESS, when there is no more work to be done. 0, otherwise.
+ */
+int getDataChunk (int threadId, char (*buffer)[MAX_STRING_LENGTH], struct PARTFILEINFO *partialInfo){
+	int ret = 0, i, j;
+	char ch;
 	if ((statusWorker[threadId] = pthread_mutex_lock (&mutex)) != 0){
 		errno = statusWorker[threadId];
 	    perror ("Error on entering monitor");
@@ -99,7 +107,7 @@ int getDataChunk (int threadId, char *buffer, struct PARTFILEINFO *partialInfo){
 	}
 	pthread_once (&init, initialization);
 	// Checks if all points in the file currently being processed have already been assigned to be computed
-	if(fgets(buffer, MAX_STRING_LENGTH, inputStream) == NULL){
+	if(fgets(*buffer, sizeof(*buffer), inputStream) == NULL){
 		if((currentFileId + 1) == numFiles){ // If it has already finished the last file, it ends the processing
 			ret = END_PROCESS;
 		} else {
@@ -113,16 +121,25 @@ int getDataChunk (int threadId, char *buffer, struct PARTFILEINFO *partialInfo){
 				ret = END_PROCESS;
 			}
 			else{
-                fgets(buffer, sizeof(buffer), inputStream);
+                fgets(*buffer, sizeof(*buffer), inputStream);
 			}
 		}
 	}
 	if(ret != END_PROCESS){
+		for(i = strlen(*buffer)-1, j = 0; i >= 0; i--, j++){ //Verification if there is not an uncomplete word
+            ch = (*buffer)[i];
+        	 if (isPonctuationSymbol(ch) || isSpace(ch) || isSeparationSymbol(ch)){ //Check if is word delimiter
+        		fseek(inputStream, -j, SEEK_CUR); //Moves the file pointer back to the last delimiter of the chunk.
+        		(*buffer)[i+1] = '\0'; //Cuts the uncomplete words from the chunk.
+        		break;
+        	}
+		} 
+		//Reset struct
 		partialInfo->fileId = currentFileId;
 		partialInfo->nCharacters = 0;
 		partialInfo->nConsoants = 0;
-		partialInfo->largestWord = 0; //numero de caracteres da maior palavra
-		partialInfo->wordCount = 0; //numero de palavras
+		partialInfo->largestWord = 0; 
+		partialInfo->wordCount = 0; 
 		for (int j = 0; j < 50; j++) {
 			partialInfo->nWordsBySize[j] = 0;
 			for (int k = 0; k < 50; k++)
@@ -137,7 +154,12 @@ int getDataChunk (int threadId, char *buffer, struct PARTFILEINFO *partialInfo){
 	}
 	return ret;
 }
-
+/**
+ *  \brief Save the information of a chunk.
+ *
+ *  \param threadId thread identification
+ *  \param *partialInfo pointer to the struct where the chunk information is saved
+ */
 void savePartialResult (int threadId, struct PARTFILEINFO *partialInfo){
 	if ((statusWorker[threadId] = pthread_mutex_lock (&mutex)) != 0){
 		errno = statusWorker[threadId];
@@ -167,11 +189,13 @@ void savePartialResult (int threadId, struct PARTFILEINFO *partialInfo){
 	}
 }
 
-
+/**
+ *  \brief Prints the final results.
+ */
 void printProcessingResults(){
     for (int i = 0; i < numFiles; i++) {
-    	printf("\nFilename: %s\n", filenames[i]);
-    	printf("Total number of words: %d\nWord Length\n", fileInfo[i]->wordCount);
+    	printf("\nFile name: %s\n", filenames[i]);
+    	printf("Total number of words = %d\nWord Length\n", fileInfo[i]->wordCount);
         printWordLength(fileInfo[i]->largestWord);
         printWordBySize(fileInfo[i]->largestWord, fileInfo[i]->nWordsBySize);
         printRelativeLength(fileInfo[i]->largestWord, fileInfo[i]->wordCount, fileInfo[i]->nWordsBySize);
@@ -185,6 +209,8 @@ void printProcessingResults(){
  *  Internal operation.
  */
 int processNextFile(){
+	if(inputStream) 
+		fclose(inputStream);
     inputStream = fopen(filenames[currentFileId], "rb");
     if(inputStream == NULL){
         fprintf(stderr,"Error on opening file %s: %s\n",filenames[currentFileId], strerror(errno));
@@ -207,6 +233,8 @@ void freeFilenames(){
  */
 void freeMemory(){
 	free(statusWorker);
+	for(int i = 0; i < numFiles; i++)
+		free(fileInfo[i]);
 	free(fileInfo);
 	freeFilenames();
 }
@@ -234,7 +262,6 @@ void printRelativeLength(int largestWord, int wordCount,int* arrayLenght) {
     for (int i = 1; i <= largestWord; i++)
     {
         printf("\t");
-        //double val = ((double)arrayLenght[i] / (double)wordCount);
         printf("%0.2f", (((double)arrayLenght[i]/ (double)wordCount)*100));
     }
     printf("\n");
@@ -247,17 +274,17 @@ void printRelativeCountConsoant(int largestWord, int wordCount, int* arrayLength
         for (int column = 1; column <= largestWord; column++)
         {
             printf("\t");
-            value = arrayConsoantCount[lign][column];
-            if(arrayLength[column]){
-                printf("%0.2f", ((double)value / (double)arrayLength[column]) * 100);
-            }
-            else {
-                printf("%0.2f", (double)0);
-
+            if(lign <= column){
+            	value = arrayConsoantCount[lign][column];
+            	if(arrayLength[column]){
+                	printf("%0.1f", ((double)value / (double)arrayLength[column]) * 100);
+            	}
+            	else {
+                	printf("%0.1f", (double)0);
+            	}
             }
         }
         printf("\n");
     }
-
 }
 
